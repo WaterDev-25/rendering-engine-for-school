@@ -1,120 +1,112 @@
-#include <SDL2/SDL.h>
 #include <iostream>
 
+#include <SDL2/SDL.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <stb/stb_image.h>
+
 #include "cwindowopengl46.hpp"
+#include "cshader.hpp"
+#include "cmodel.hpp"
+#include "ccubemap.hpp"
+
+glm::mat4 GetViewMatrix()
+{
+    float radius = 10.0f;
+    float camX = static_cast<float>(sin((SDL_GetTicks() / 1000.0f)) * radius);
+    float camZ = static_cast<float>(cos((SDL_GetTicks() / 1000.0f)) * radius);
+
+    return glm::lookAt(glm::vec3(camX, 3.0f, camZ), glm::vec3(-2.0f, 0.0f, -2.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+}
 
 int main(int argc, char** argv)
 {
-    CWindowOpenGL46 window(1280, 720, "engine");
+    const int wWidth = 1920;
+    const int wHeight = 1080;
 
-    // Shaders section
-    // 
-    // Vertex shader
-    //
+    CWindowOpenGL46 window(wWidth, wHeight, "engine");
 
-    const char* vShaderSource = "#version 460 core\n"
-        "layout(location = 0) in vec3 aPos;\n"
-        "void main()\n"
-        "{\n"
-        "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-        "}\0";
+    SDL_SetWindowFullscreen(window.GetHandle(), SDL_WINDOW_FULLSCREEN_DESKTOP);
 
-    unsigned int vShader = glCreateShader(GL_VERTEX_SHADER);
+    stbi_set_flip_vertically_on_load(true);
 
-    glShaderSource(vShader, 1, &vShaderSource, NULL);
-    glCompileShader(vShader);
+    glEnable(GL_DEPTH_TEST);
 
-    int success;
-    char infoLog[512];
+    CShader baseShader("shaders/base_vs.glsl", "shaders/base_fs.glsl");
+    CShader cubeMapShader("shaders/cubemap_vs.glsl", "shaders/cubemap_fs.glsl");
 
-    glGetShaderiv(vShader, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(vShader, 512, NULL, infoLog);
-        std::cout << "WARNING --- Vertex shader compilation failed ---" << std::endl << infoLog << std::endl;
-    }
+    CModel baseModel("models/nfc/asm.obj");
 
-    //
-    // Fragment shader
-    //
-
-    const char* fShaderSource = "#version 460 core\n"
-        "out vec4 FragColor;\n"
-        "void main()\n"
-        "{\n"
-        "   FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
-        "}\0";
-
-    unsigned int fShader = glCreateShader(GL_FRAGMENT_SHADER);
-    
-    glShaderSource(fShader, 1, &fShaderSource, NULL);
-    glCompileShader(fShader);
-
-    glGetShaderiv(fShader, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(fShader, 512, NULL, infoLog);
-        std::cout << "WARNING --- Fragment shader compilation failed ---" << std::endl << infoLog << std::endl;
-    }
-
-    //
-    // Program shader
-    //
-
-    unsigned int sProgram = glCreateProgram();
-
-    glAttachShader(sProgram, vShader);
-    glAttachShader(sProgram, fShader);
-
-    glLinkProgram(sProgram);
-
-    glGetProgramiv(sProgram, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-        glGetProgramInfoLog(sProgram, 512, NULL, infoLog);
-        std::cout << "WARNING --- Program shader linking failed ---" << std::endl << infoLog << std::endl;
-    }
-
-    glDeleteShader(vShader);
-    glDeleteShader(fShader);
-
-    float vertices[] = {
-        -0.5f, -0.5f, 0.0f,
-         0.5f, -0.5f, 0.0f,
-         0.0f,  0.5f, 0.0f
+    std::vector<std::string> cubeMapTextures = {
+        "textures/cubemap/maskonaive/right.jpg",
+        "textures/cubemap/maskonaive/left.jpg",
+        "textures/cubemap/maskonaive/top.jpg",
+        "textures/cubemap/maskonaive/bottom.jpg",
+        "textures/cubemap/maskonaive/front.jpg",
+        "textures/cubemap/maskonaive/back.jpg"
     };
 
-    unsigned int vbo, vao;
-    
-    glGenBuffers(1, &vbo);
-    glGenVertexArrays(1, &vao);
-    
-    glBindVertexArray(vao);
+    CCubeMap cubeMap(cubeMapTextures);
 
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    baseShader.Use();
+    baseShader.SetInt("material.diffuse", 0);
+    baseShader.SetInt("material.specular", 1);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    glBindVertexArray(0);
+    cubeMapShader.Use();
+    cubeMapShader.SetInt("skybox", 0);
 
     SDL_Event windowEvent;
 
+    float lastFrame = 0.0f;
+    float deltaTime = 0.0f;
+
     while (true)
     {
+        float currentFrame = static_cast<float>(SDL_GetTicks() / 1000.0f);
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
         if (SDL_PollEvent(&windowEvent))
             if (windowEvent.type == SDL_QUIT)
                 break;
 
-        glClear(GL_COLOR_BUFFER_BIT);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUseProgram(sProgram);
-        glBindVertexArray(vao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        baseShader.Use();
+
+        baseShader.SetVec3("light.position", 0.5f, -1.0f, -1.0f);
+        baseShader.SetVec3("viewPos", GetViewMatrix()[3]);
+
+        baseShader.SetVec3("light.ambient", 0.2f, 0.2f, 0.2f);
+        baseShader.SetVec3("light.diffuse", 1.0f, 1.0f, 1.0f);
+        baseShader.SetVec3("light.specular", 1.0f, 1.0f, 1.0f);
+        baseShader.SetFloat("light.constant", 1.0f);
+        baseShader.SetFloat("light.linear", 0.09f);
+        baseShader.SetFloat("light.quadratic", 0.032f);
+
+        baseShader.SetFloat("material.shininess", 32.0f);
+
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 view = GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)wWidth / (float)wHeight, 0.1f, 100.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
+        model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+        baseShader.SetMat4("model", model);
+        baseShader.SetMat4("projection", projection);
+        baseShader.SetMat4("view", view);
+        
+        baseModel.Draw(baseShader);
+
+        cubeMapShader.Use();
+        view = glm::mat4(glm::mat3(GetViewMatrix()));
+        cubeMapShader.SetMat4("view", view);
+        cubeMapShader.SetMat4("projection", projection);
+
+        cubeMap.Draw();
 
         SDL_GL_SwapWindow(window.GetHandle());
     }
