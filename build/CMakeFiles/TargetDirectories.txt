@@ -1,5 +1,0 @@
-/Users/waterdev/Developer/rendering-engine-for-school/build/CMakeFiles/edit_cache.dir
-/Users/waterdev/Developer/rendering-engine-for-school/build/CMakeFiles/rebuild_cache.dir
-/Users/waterdev/Developer/rendering-engine-for-school/build/engine/CMakeFiles/engine.dir
-/Users/waterdev/Developer/rendering-engine-for-school/build/engine/CMakeFiles/edit_cache.dir
-/Users/waterdev/Developer/rendering-engine-for-school/build/engine/CMakeFiles/rebuild_cache.dir
