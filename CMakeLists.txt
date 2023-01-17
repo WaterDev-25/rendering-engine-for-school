@@ -14,4 +14,11 @@ if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
 	link_directories(${CMAKE_SOURCE_DIR}/lib/x64/windows)
 endif()
 
+if(APPLE)
+	find_package(SDL2 REQUIRED)
+	find_package(GLEW REQUIRED)
+	find_package(ASSIMP REQUIRED)
+	find_package(OpenGL REQUIRED)
+endif()
+
 add_subdirectory(${CMAKE_SOURCE_DIR}/engine)
